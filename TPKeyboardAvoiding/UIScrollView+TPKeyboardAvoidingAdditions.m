@@ -68,19 +68,15 @@ static const int kStateKey;
     }
     
     // Shrink view's inset by the keyboard's height, and scroll to show the text field/view being edited
-    [UIView beginAnimations:nil context:NULL];
-    [UIView setAnimationCurve:[[[notification userInfo] objectForKey:UIKeyboardAnimationCurveUserInfoKey] intValue]];
-    [UIView setAnimationDuration:[[[notification userInfo] objectForKey:UIKeyboardAnimationDurationUserInfoKey] floatValue]];
-
-    self.contentInset = [self TPKeyboardAvoiding_contentInsetForKeyboard];
-    CGFloat viewableHeight = self.bounds.size.height - self.contentInset.top - self.contentInset.bottom;
-    [self setContentOffset:CGPointMake(self.contentOffset.x,
-                                       [self TPKeyboardAvoiding_idealOffsetForView:firstResponder
-                                                             withViewingAreaHeight:viewableHeight])
-                  animated:NO];
-    self.scrollIndicatorInsets = self.contentInset;
-    
-    [UIView commitAnimations];
+    [UIView animateWithDuration:[[[notification userInfo] objectForKey:UIKeyboardAnimationDurationUserInfoKey] doubleValue] animations:^{
+        self.contentInset = [self TPKeyboardAvoiding_contentInsetForKeyboard];
+        CGFloat viewableHeight = self.bounds.size.height/2 - self.contentInset.top - self.contentInset.bottom;
+        [self setContentOffset:CGPointMake(self.contentOffset.x,
+                                           [self TPKeyboardAvoiding_idealOffsetForView:firstResponder
+                                                                 withViewingAreaHeight:viewableHeight])
+                      animated:NO];
+        self.scrollIndicatorInsets = self.contentInset;
+    }];
 }
 
 - (void)TPKeyboardAvoiding_keyboardWillHide:(NSNotification*)notification {
@@ -211,7 +207,7 @@ static const int kStateKey;
     TPKeyboardAvoidingState *state = self.keyboardAvoidingState;
     UIEdgeInsets newInset = self.contentInset;
     CGRect keyboardRect = state.keyboardRect;
-    newInset.bottom = keyboardRect.size.height - (CGRectGetMaxY(keyboardRect) - self.bounds.size.height);
+    newInset.bottom = keyboardRect.size.height;
     return newInset;
 }
 

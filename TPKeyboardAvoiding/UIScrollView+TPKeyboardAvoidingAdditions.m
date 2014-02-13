@@ -47,10 +47,6 @@ static const int kStateKey;
     }
     
     UIView *firstResponder = [self TPKeyboardAvoiding_findFirstResponderBeneathView:self];
-    if ( !firstResponder ) {
-        // No child view is the first responder - nothing to do here
-        return;
-    }
     
     state.keyboardRect = [self convertRect:[[[notification userInfo] objectForKey:_UIKeyboardFrameEndUserInfoKey] CGRectValue] fromView:nil];
     state.keyboardVisible = YES;
@@ -60,7 +56,7 @@ static const int kStateKey;
     if ( [self isKindOfClass:[TPKeyboardAvoidingScrollView class]] ) {
         state.priorContentSize = self.contentSize;
         
-        if ( self.constraints.count == 0 && CGSizeEqualToSize(self.contentSize, CGSizeZero) ) {
+        if ( (![self respondsToSelector:@selector(constraints)] || self.constraints.count == 0) && CGSizeEqualToSize(self.contentSize, CGSizeZero) ) {
             // Set the content size, if it's not set. Do not set content size explicitly if auto-layout
             // is being used to manage subviews
             self.contentSize = [self TPKeyboardAvoiding_calculatedContentSizeFromSubviewFrames];
@@ -70,11 +66,12 @@ static const int kStateKey;
     // Shrink view's inset by the keyboard's height, and scroll to show the text field/view being edited
     [UIView animateWithDuration:[[[notification userInfo] objectForKey:UIKeyboardAnimationDurationUserInfoKey] doubleValue] animations:^{
         self.contentInset = [self TPKeyboardAvoiding_contentInsetForKeyboard];
-        CGFloat viewableHeight = self.bounds.size.height/2 - self.contentInset.top - self.contentInset.bottom;
-        [self setContentOffset:CGPointMake(self.contentOffset.x,
-                                           [self TPKeyboardAvoiding_idealOffsetForView:firstResponder
-                                                                 withViewingAreaHeight:viewableHeight])
-                      animated:NO];
+
+        if (firstResponder) {
+            CGFloat viewableHeight = self.bounds.size.height/2 - self.contentInset.top - self.contentInset.bottom;
+            [self setContentOffset:CGPointMake(self.contentOffset.x, [self TPKeyboardAvoiding_idealOffsetForView:firstResponder withViewingAreaHeight:viewableHeight]) animated:NO];
+        }
+
         self.scrollIndicatorInsets = self.contentInset;
     }];
 }
@@ -174,7 +171,11 @@ static const int kStateKey;
         if ( childView.hidden ) continue;
         if ( ([childView isKindOfClass:[UITextField class]] || [childView isKindOfClass:[UITextView class]]) ) {
             CGRect frame = [self convertRect:childView.frame fromView:view];
-            if ( childView != priorTextField && CGRectGetMinY(frame) >= priorFieldOffset && CGRectGetMinY(frame) < *minY ) {
+            if ( childView != priorTextField
+                    && CGRectGetMinY(frame) >= priorFieldOffset
+                    && CGRectGetMinY(frame) < *minY &&
+                    !(frame.origin.y == priorTextField.frame.origin.y
+                      && frame.origin.x < priorTextField.frame.origin.x) ) {
                 *minY = CGRectGetMinY(frame);
                 *foundView = childView;
             }
@@ -195,13 +196,25 @@ static const int kStateKey;
 }
 
 -(CGSize)TPKeyboardAvoiding_calculatedContentSizeFromSubviewFrames {
+    
+    BOOL wasShowingVerticalScrollIndicator = self.showsVerticalScrollIndicator;
+    BOOL wasShowingHorizontalScrollIndicator = self.showsHorizontalScrollIndicator;
+    
+    self.showsVerticalScrollIndicator = NO;
+    self.showsHorizontalScrollIndicator = NO;
+    
     CGRect rect = CGRectZero;
     for ( UIView *view in self.subviews ) {
         rect = CGRectUnion(rect, view.frame);
     }
     rect.size.height += kCalculatedContentPadding;
+    
+    self.showsVerticalScrollIndicator = wasShowingVerticalScrollIndicator;
+    self.showsHorizontalScrollIndicator = wasShowingHorizontalScrollIndicator;
+    
     return rect.size;
 }
+
 
 - (UIEdgeInsets)TPKeyboardAvoiding_contentInsetForKeyboard {
     TPKeyboardAvoidingState *state = self.keyboardAvoidingState;
